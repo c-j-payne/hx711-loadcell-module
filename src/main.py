@@ -14,7 +14,7 @@ from hx711 import HX711
 
 class HX711Sensor(Sensor):
     """HX711 Load Cell Sensor with Calibration Support"""
-    MODEL: ClassVar[Model] = Model(ModelFamily("viam", "sensor"), "hx711")
+    MODEL: ClassVar[Model] = Model(ModelFamily("chris", "sensor"), "hx711")
     
     def __init__(self, name: str):
         super().__init__(name)

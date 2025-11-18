@@ -6,7 +6,7 @@
   "models": [
     {
       "api": "rdk:component:sensor",
-      "model": "c-j-payne:sensor:hx711"
+      "model": "chris:sensor:hx711"
     }
   ],
   "entrypoint": "src/main.py"
