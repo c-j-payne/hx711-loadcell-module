@@ -1,5 +1,5 @@
 {
-  "module_id": "hx711-loadcell",
+  "module_id": "chris:hx711-loadcell",
   "visibility": "public",
   "url": "https://github.com/c-j-payne/hx711-loadcell-module",
   "description": "HX711 Load Cell Amplifier module with calibration support for force and weight measurements",
