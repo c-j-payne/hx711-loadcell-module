@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import asyncio
 from typing import Any, ClassVar, Mapping, Optional, Sequence
 from viam.components.sensor import Sensor
