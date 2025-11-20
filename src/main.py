@@ -1,4 +1,3 @@
-#!/home/viam/loadcell/venv/bin/python3
 import asyncio
 from typing import Any, ClassVar, Mapping, Optional, Sequence
 from viam.components.sensor import Sensor
@@ -8,9 +7,16 @@ from viam.proto.common import ResourceName
 from viam.resource.base import ResourceBase
 from viam.resource.types import Model, ModelFamily
 from viam.utils import SensorReading
-import sys
-sys.path.insert(0, '/home/viam/loadcell/hx711py')
-from hx711 import HX711
+
+# Import HX711 from local directory or installed package
+try:
+    from hx711 import HX711
+except ImportError:
+    # If bundled in the module
+    import sys
+    import os
+    sys.path.insert(0, os.path.dirname(__file__))
+    from hx711 import HX711
 
 class HX711Sensor(Sensor):
     """HX711 Load Cell Sensor with Calibration Support"""
