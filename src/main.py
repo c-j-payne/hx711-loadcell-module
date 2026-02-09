@@ -37,8 +37,9 @@ class HX711Sensor(Sensor):
         return sensor
     
     @classmethod
-    def validate_config(cls, config: ComponentConfig) -> Sequence[str]:
-        return []
+    def validate_config(cls, config: ComponentConfig) -> tuple[Sequence[str], Sequence[str]]:
+        # Return (required_dependencies, optional_dependencies)
+        return ([], [])
     
     def reconfigure(self, config: ComponentConfig, dependencies: Mapping[ResourceName, ResourceBase]):
         data_pin = int(config.attributes.fields["data_pin"].number_value)
@@ -76,13 +77,20 @@ class HX711Sensor(Sensor):
                 self.hx.power_down()
             except:
                 pass
+
+        self.logger.info(f"data_pin: {data_pin}, clock_pin: {clock_pin}")
+        self.logger.info(f"samples_field: {samples_field}, slope_field: {slope_field}, offset_field: {offset_field}, unit_field: {unit_field}")
         
+        self.logger.info("Initializing HX711 loadcell")
         self.hx = HX711(data_pin, clock_pin)
+        self.logger.info("Initialized HX711 loadcell")
         self.hx.reset()
         
         # NEVER tare when calibration is provided - we need raw ADC values
         if self.calibration_slope is None or self.calibration_offset is None:
+            self.logger.info("Calibrating loadcell")
             self.hx.tare()
+            self.logger.info("Calibrated loadcell")
     
     async def get_readings(self, *, extra: Optional[Mapping[str, Any]] = None,
                       timeout: Optional[float] = None, **kwargs) -> Mapping[str, SensorReading]:
@@ -109,6 +117,7 @@ class HX711Sensor(Sensor):
     async def close(self):
         if self.hx:
             self.hx.power_down()
+            self.hx.cleanup()
 
 if __name__ == "__main__":
     from viam.resource.registry import Registry, ResourceCreatorRegistration

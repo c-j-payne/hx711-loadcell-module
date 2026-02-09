@@ -9,6 +9,14 @@
       "model": "chris:sensor:hx711"
     }
   ],
-  "entrypoint": "src/main.py",
-  "first_run": "setup.sh"
+  "entrypoint": "dist/main",
+  "first_run": "",
+  "build": {
+    "build": "./build.sh",
+    "setup": "./setup.sh",
+    "path": "dist/archive.tar.gz",
+    "arch": [
+      "linux/arm64"
+    ]
+  }
 }

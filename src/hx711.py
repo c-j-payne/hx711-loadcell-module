@@ -1,4 +1,4 @@
-import RPi.GPIO as GPIO
+import lgpio
 import time
 import threading
 
@@ -12,10 +12,13 @@ class HX711:
         # Mutex for reading from the HX711, in case multiple threads in client
         # software try to access get values from the class at the same time.
         self.readLock = threading.Lock()
-        
-        GPIO.setmode(GPIO.BCM)
-        GPIO.setup(self.PD_SCK, GPIO.OUT)
-        GPIO.setup(self.DOUT, GPIO.IN)
+
+        # Open GPIO chip (typically 0 for /dev/gpiochip0 on Raspberry Pi)
+        self.chip = lgpio.gpiochip_open(0)
+
+        # Claim GPIO pins
+        lgpio.gpio_claim_output(self.chip, self.PD_SCK)
+        lgpio.gpio_claim_input(self.chip, self.DOUT)
 
         self.GAIN = 0
 
@@ -44,7 +47,7 @@ class HX711:
 
     
     def is_ready(self):
-        return GPIO.input(self.DOUT) == 0
+        return lgpio.gpio_read(self.chip, self.DOUT) == 0
 
     
     def set_gain(self, gain):
@@ -55,7 +58,7 @@ class HX711:
         elif gain == 32:
             self.GAIN = 2
 
-        GPIO.output(self.PD_SCK, False)
+        lgpio.gpio_write(self.chip, self.PD_SCK, 0)
 
         # Read out a set of raw bytes and throw it away.
         self.readRawBytes()
@@ -77,9 +80,9 @@ class HX711:
        # Clock HX711 Digital Serial Clock (PD_SCK).  DOUT will be
        # ready 1us after PD_SCK rising edge, so we sample after
        # lowering PD_SCL, when we know DOUT will be stable.
-       GPIO.output(self.PD_SCK, True)
-       GPIO.output(self.PD_SCK, False)
-       value = GPIO.input(self.DOUT)
+       lgpio.gpio_write(self.chip, self.PD_SCK, 1)
+       lgpio.gpio_write(self.chip, self.PD_SCK, 0)
+       value = lgpio.gpio_read(self.chip, self.DOUT)
 
        # Convert Boolean to int and return it.
        return int(value)
@@ -378,8 +381,8 @@ class HX711:
         # Because a rising edge on HX711 Digital Serial Clock (PD_SCK).  We then
         # leave it held up and wait 100us.  After 60us the HX711 should be
         # powered down.
-        GPIO.output(self.PD_SCK, False)
-        GPIO.output(self.PD_SCK, True)
+        lgpio.gpio_write(self.chip, self.PD_SCK, 0)
+        lgpio.gpio_write(self.chip, self.PD_SCK, 1)
 
         time.sleep(0.0001)
 
@@ -394,7 +397,7 @@ class HX711:
         self.readLock.acquire()
 
         # Lower the HX711 Digital Serial Clock (PD_SCK) line.
-        GPIO.output(self.PD_SCK, False)
+        lgpio.gpio_write(self.chip, self.PD_SCK, 0)
 
         # Wait 100 us for the HX711 to power back up.
         time.sleep(0.0001)
@@ -415,8 +418,18 @@ class HX711:
         self.power_down()
         self.power_up()
 
+    def cleanup(self):
+        """Clean up GPIO resources"""
+        try:
+            lgpio.gpio_free(self.chip, self.PD_SCK)
+            lgpio.gpio_free(self.chip, self.DOUT)
+            lgpio.gpiochip_close(self.chip)
+        except:
+            pass
+
 def hx711_add_event_detect(hx711_instance, event_callback):
-        GPIO.add_event_detect(self.DOUT, GPIO.FALLING, 
-            callback=event_callback)
+        # Note: lgpio uses a different event detection mechanism
+        # This would need to be implemented using lgpio.gpio_claim_alert if needed
+        pass
 
 # EOF - hx711.py

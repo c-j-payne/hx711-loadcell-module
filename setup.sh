@@ -1,14 +1,54 @@
-#!/bin/bash
-set -e
+#!/bin/sh
+cd `dirname $0`
 
-# Get the directory where this script is located
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+# Create a virtual environment to run our code
+VENV_NAME="venv"
+PYTHON="$VENV_NAME/bin/python"
+ENV_ERROR="This module requires Python >=3.8, pip, and virtualenv to be installed."
 
-# Ensure pip is available
-if ! python3 -m pip --version > /dev/null 2>&1; then
-    echo "pip not found, installing..."
-    apt-get update && apt-get install -y python3-pip
+# Install system dependencies for lgpio
+if command -v apt-get >/dev/null; then
+    SUDO="sudo"
+    if ! command -v $SUDO >/dev/null; then
+        SUDO=""
+    fi
+    echo "Installing system dependencies for lgpio..."
+    $SUDO apt -qq update >/dev/null 2>&1
+    $SUDO apt install -qqy python3-lgpio >/dev/null 2>&1
+    echo "Installed system dependencies for lgpio."
 fi
 
-# Install Python dependencies with --break-system-packages for externally managed environments
-python3 -m pip install --break-system-packages -r "$SCRIPT_DIR/requirements.txt"
+if ! python3 -m venv --system-site-packages $VENV_NAME >/dev/null 2>&1; then
+    echo "Failed to create virtualenv."
+    if command -v apt-get >/dev/null; then
+        echo "Detected Debian/Ubuntu, attempting to install python3-venv automatically."
+        SUDO="sudo"
+        if ! command -v $SUDO >/dev/null; then
+            SUDO=""
+        fi
+		if ! apt info python3-venv >/dev/null 2>&1; then
+			echo "Package info not found, trying apt update"
+			$SUDO apt -qq update >/dev/null
+		fi
+        $SUDO apt install -qqy python3-venv >/dev/null 2>&1
+        if ! python3 -m venv --system-site-packages $VENV_NAME >/dev/null 2>&1; then
+            echo $ENV_ERROR >&2
+            exit 1
+        fi
+    else
+        echo $ENV_ERROR >&2
+        exit 1
+    fi
+fi
+
+# remove -U if viam-sdk should not be upgraded whenever possible
+# -qq suppresses extraneous output from pip
+echo "Virtualenv found/created. Installing/upgrading Python packages..."
+if ! [ -f .installed ]; then
+    echo "Installing/upgrading Python packages from requirements.txt..."
+    if ! $PYTHON -m pip install -r requirements.txt -Uqq; then
+        exit 1
+    else
+        touch .installed
+    fi
+fi
