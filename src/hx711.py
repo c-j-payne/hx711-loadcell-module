@@ -44,9 +44,6 @@ class HX711:
         print("Power cycled")
 
         self.set_gain(gain)
-        
-        # Think about whether this is necessary.
-        time.sleep(1)
 
 
     def convertFromTwosComplement24bit(self, inputValue):
