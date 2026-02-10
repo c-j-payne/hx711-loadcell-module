@@ -33,10 +33,17 @@ class HX711:
         self.byte_format = 'MSB'
         self.bit_format = 'MSB'
 
+        # Ensure PD_SCK starts low to prevent accidental power-down
+        GPIO.output(self.PD_SCK, False)
+
+        # Power cycle the HX711 to ensure it starts in a known state
+        GPIO.output(self.PD_SCK, True)
+        time.sleep(0.0001)
+        GPIO.output(self.PD_SCK, False)
+        time.sleep(0.5)
+        print("Power cycled")
+
         self.set_gain(gain)
-        
-        # Think about whether this is necessary.
-        time.sleep(1)
 
 
     def convertFromTwosComplement24bit(self, inputValue):
@@ -108,8 +115,12 @@ class HX711:
         self.readLock.acquire()
 
         # Wait until HX711 is ready for us to read a sample.
+        # Timeout after 5 seconds to prevent infinite hangs
+        timeout = time.time() + 5
         while not self.is_ready():
-           pass
+           if time.time() > timeout:
+               self.readLock.release()
+               raise TimeoutError("HX711 not ready: DOUT pin never went low. Check wiring and power.")
 
         # Read three bytes of data from the HX711.
         firstByte  = self.readNextByte()
