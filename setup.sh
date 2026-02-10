@@ -6,18 +6,6 @@ VENV_NAME="venv"
 PYTHON="$VENV_NAME/bin/python"
 ENV_ERROR="This module requires Python >=3.8, pip, and virtualenv to be installed."
 
-# Install system dependencies for lgpio
-if command -v apt-get >/dev/null; then
-    SUDO="sudo"
-    if ! command -v $SUDO >/dev/null; then
-        SUDO=""
-    fi
-    echo "Installing system dependencies for lgpio..."
-    $SUDO apt -qq update >/dev/null 2>&1
-    $SUDO apt install -qqy python3-lgpio >/dev/null 2>&1
-    echo "Installed system dependencies for lgpio."
-fi
-
 if ! python3 -m venv --system-site-packages $VENV_NAME >/dev/null 2>&1; then
     echo "Failed to create virtualenv."
     if command -v apt-get >/dev/null; then
@@ -52,3 +40,5 @@ if ! [ -f .installed ]; then
         touch .installed
     fi
 fi
+
+pip list

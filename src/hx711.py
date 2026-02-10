@@ -1,4 +1,4 @@
-import lgpio
+from gpiozero import DigitalOutputDevice, DigitalInputDevice
 import time
 import threading
 
@@ -13,12 +13,9 @@ class HX711:
         # software try to access get values from the class at the same time.
         self.readLock = threading.Lock()
 
-        # Open GPIO chip (typically 0 for /dev/gpiochip0 on Raspberry Pi)
-        self.chip = lgpio.gpiochip_open(0)
-
-        # Claim GPIO pins
-        lgpio.gpio_claim_output(self.chip, self.PD_SCK)
-        lgpio.gpio_claim_input(self.chip, self.DOUT)
+        # Initialize GPIO pins using gpiozero
+        self.pd_sck_device = DigitalOutputDevice(self.PD_SCK)
+        self.dout_device = DigitalInputDevice(self.DOUT)
 
         self.GAIN = 0
 
@@ -36,6 +33,16 @@ class HX711:
         self.byte_format = 'MSB'
         self.bit_format = 'MSB'
 
+        # Ensure PD_SCK starts low to prevent accidental power-down
+        self.pd_sck_device.off()
+
+        # Power cycle the HX711 to ensure it starts in a known state
+        self.pd_sck_device.off()        
+        time.sleep(0.0001)
+        self.pd_sck_device.off()
+        time.sleep(0.5)
+        print("Power cycled")
+
         self.set_gain(gain)
         
         # Think about whether this is necessary.
@@ -47,7 +54,7 @@ class HX711:
 
     
     def is_ready(self):
-        return lgpio.gpio_read(self.chip, self.DOUT) == 0
+        return self.dout_device.value == 0
 
     
     def set_gain(self, gain):
@@ -58,7 +65,7 @@ class HX711:
         elif gain == 32:
             self.GAIN = 2
 
-        lgpio.gpio_write(self.chip, self.PD_SCK, 0)
+        self.pd_sck_device.off()
 
         # Read out a set of raw bytes and throw it away.
         self.readRawBytes()
@@ -80,9 +87,9 @@ class HX711:
        # Clock HX711 Digital Serial Clock (PD_SCK).  DOUT will be
        # ready 1us after PD_SCK rising edge, so we sample after
        # lowering PD_SCL, when we know DOUT will be stable.
-       lgpio.gpio_write(self.chip, self.PD_SCK, 1)
-       lgpio.gpio_write(self.chip, self.PD_SCK, 0)
-       value = lgpio.gpio_read(self.chip, self.DOUT)
+       self.pd_sck_device.on()
+       self.pd_sck_device.off()
+       value = self.dout_device.value
 
        # Convert Boolean to int and return it.
        return int(value)
@@ -111,8 +118,12 @@ class HX711:
         self.readLock.acquire()
 
         # Wait until HX711 is ready for us to read a sample.
+        # Timeout after 5 seconds to prevent infinite hangs
+        timeout = time.time() + 5
         while not self.is_ready():
-           pass
+           if time.time() > timeout:
+               self.readLock.release()
+               raise TimeoutError("HX711 not ready: DOUT pin never went low. Check wiring and power.")
 
         # Read three bytes of data from the HX711.
         firstByte  = self.readNextByte()
@@ -362,7 +373,7 @@ class HX711:
 
 
     def get_reference_unit(self):
-        return get_reference_unit_A()
+        return self.get_reference_unit_A()
 
         
     def get_reference_unit_A(self):
@@ -381,8 +392,8 @@ class HX711:
         # Because a rising edge on HX711 Digital Serial Clock (PD_SCK).  We then
         # leave it held up and wait 100us.  After 60us the HX711 should be
         # powered down.
-        lgpio.gpio_write(self.chip, self.PD_SCK, 0)
-        lgpio.gpio_write(self.chip, self.PD_SCK, 1)
+        self.pd_sck_device.off()
+        self.pd_sck_device.on()
 
         time.sleep(0.0001)
 
@@ -397,7 +408,7 @@ class HX711:
         self.readLock.acquire()
 
         # Lower the HX711 Digital Serial Clock (PD_SCK) line.
-        lgpio.gpio_write(self.chip, self.PD_SCK, 0)
+        self.pd_sck_device.off()
 
         # Wait 100 us for the HX711 to power back up.
         time.sleep(0.0001)
@@ -421,9 +432,8 @@ class HX711:
     def cleanup(self):
         """Clean up GPIO resources"""
         try:
-            lgpio.gpio_free(self.chip, self.PD_SCK)
-            lgpio.gpio_free(self.chip, self.DOUT)
-            lgpio.gpiochip_close(self.chip)
+            self.pd_sck_device.close()
+            self.dout_device.close()
         except:
             pass
 
