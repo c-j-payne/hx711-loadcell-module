@@ -2,9 +2,7 @@ package hx711_loadcell
 
 import (
 	"fmt"
-	"math"
 	"runtime"
-	"sort"
 	"sync"
 	"time"
 
@@ -200,33 +198,6 @@ func (h *HX711) ReadLong() (int32, error) {
 	return signed, nil
 }
 
-// ReadMedian takes n readings and returns the median.
-func (h *HX711) ReadMedian(n int) (float64, error) {
-	if n <= 0 {
-		return 0, fmt.Errorf("samples must be >= 1")
-	}
-	if n == 1 {
-		v, err := h.ReadLong()
-		return float64(v), err
-	}
-
-	values := make([]float64, n)
-	for i := 0; i < n; i++ {
-		v, err := h.ReadLong()
-		if err != nil {
-			return 0, err
-		}
-		values[i] = float64(v)
-	}
-	sort.Float64s(values)
-
-	if n%2 == 1 {
-		return values[n/2], nil
-	}
-	mid := n / 2
-	return (values[mid-1] + values[mid]) / 2.0, nil
-}
-
 // ReadAverage takes n readings, trims 20% outliers, and returns the mean.
 func (h *HX711) ReadAverage(n int) (float64, error) {
 	if n <= 0 {
@@ -236,9 +207,6 @@ func (h *HX711) ReadAverage(n int) (float64, error) {
 		v, err := h.ReadLong()
 		return float64(v), err
 	}
-	if n < 5 {
-		return h.ReadMedian(n)
-	}
 
 	values := make([]float64, n)
 	for i := 0; i < n; i++ {
@@ -248,17 +216,8 @@ func (h *HX711) ReadAverage(n int) (float64, error) {
 		}
 		values[i] = float64(v)
 	}
-	sort.Float64s(values)
 
-	// Trim 20% from each end
-	trim := int(float64(n) * 0.2)
-	trimmed := values[trim : n-trim]
-
-	var sum float64
-	for _, v := range trimmed {
-		sum += v
-	}
-	return sum / float64(len(trimmed)), nil
+	return average(values), nil
 }
 
 // PowerDown puts the HX711 into low-power mode.
@@ -276,9 +235,4 @@ func (h *HX711) Close() {
 	h.PowerDown()
 	h.dout.Close()
 	h.pdSck.Close()
-}
-
-func roundTo(val float64, places int) float64 {
-	p := math.Pow(10, float64(places))
-	return math.Round(val*p) / p
 }

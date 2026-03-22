@@ -1,11 +1,10 @@
-GOOS ?= linux
-GOARCH ?= arm64
 
 hx711-loadcell: *.go cmd/module/*.go go.mod go.sum
-	GOOS=$(GOOS) GOARCH=$(GOARCH) go build -o hx711-loadcell cmd/module/cmd.go
+	GOOS=linux GOARCH=arm64 go build -o hx711-loadcell cmd/module/cmd.go
+
 
 test:
-	go test
+	GOOS=linux GOARCH=arm64 go test
 
 lint:
 	gofmt -w -s .

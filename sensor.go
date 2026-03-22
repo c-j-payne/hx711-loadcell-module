@@ -114,7 +114,7 @@ func (s *hx711Sensor) tare(n int) error {
 }
 
 func (s *hx711Sensor) getValue() (float64, error) {
-	median, err := s.hx.ReadMedian(s.samples)
+	median, err := s.hx.ReadAverage(s.samples)
 	if err != nil {
 		return 0, err
 	}
@@ -130,15 +130,15 @@ func (s *hx711Sensor) Readings(ctx context.Context, extra map[string]interface{}
 	}
 
 	readings := map[string]interface{}{
-		"raw_value": roundTo(rawValue, 2),
+		"raw_value": rawValue,
 	}
 
 	if s.calibrationSlope != nil {
 		weightKg := (*s.calibrationSlope * rawValue)
 		forceN := weightKg * 9.81
 
-		readings["weight_kg"] = roundTo(weightKg, 4)
-		readings["force_N"] = roundTo(forceN, 4)
+		readings["weight_kg"] = weightKg
+		readings["force_N"] = forceN
 	}
 
 	return readings, nil
