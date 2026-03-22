@@ -3,6 +3,7 @@ package hx711_loadcell
 import (
 	"fmt"
 	"math"
+	"runtime"
 	"sort"
 	"sync"
 	"time"
@@ -101,23 +102,13 @@ func NewHX711(chipName string, doutPin, pdSckPin, gain int, logger logging.Logge
 }
 
 // readBit clocks PD_SCK and reads one bit from DOUT.
-// Per HX711 datasheet: data is valid 0.1μs (T3) after PD_SCK rising edge,
-// and PD_SCK must stay high for at least 0.2μs (T1) but under 60μs.
+// The gpiocdev ioctl calls take ~10-20μs each, which satisfies
+// both T1 (PD_SCK high min 0.2μs) and T3 (data valid after 0.1μs).
 func (h *HX711) readBit() (int, error) {
 	h.pdSck.SetValue(1)
-	// Busy-wait ~1μs for data to settle (T3=0.1μs, T1 min=0.2μs)
-	busyWait()
 	val, err := h.dout.Value()
 	h.pdSck.SetValue(0)
 	return val, err
-}
-
-// busyWait spins for approximately 1 microsecond.
-//
-//go:noinline
-func busyWait() {
-	for i := 0; i < 200; i++ {
-	}
 }
 
 // readByte reads 8 bits MSB-first and returns a byte value.
@@ -156,6 +147,11 @@ func (h *HX711) readRawBytes() ([3]byte, error) {
 		time.Sleep(100 * time.Microsecond)
 	}
 	h.logger.Debugf("HX711 ready after %d waits", waitCount)
+
+	// Lock OS thread during bit-banging to prevent goroutine preemption.
+	// If PD_SCK stays HIGH >60μs (due to context switch), the HX711 resets.
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
 
 	// Read 3 bytes of data
 	var data [3]byte
