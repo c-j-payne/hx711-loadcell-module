@@ -67,18 +67,20 @@ func newSensor(ctx context.Context, deps resource.Dependencies, config resource.
 	}
 
 	s := &hx711Sensor{
-		name:              config.ResourceName(),
-		hx:                hx,
-		samples:           samples,
-		logger:            logger,
-		calibrationSlope:  conf.CalibrationSlope,
-		calibrationOffset: conf.CalibrationOffset,
+		name:             config.ResourceName(),
+		hx:               hx,
+		samples:          samples,
+		logger:           logger,
+		calibrationSlope: conf.CalibrationSlope,
 	}
 
-	// Only tare when no calibration is provided (calibration needs raw ADC values)
-	if conf.CalibrationSlope == nil || conf.CalibrationOffset == nil {
-		if err := hx.Tare(15); err != nil {
-			return nil, fmt.Errorf("tare failed: %w", err)
+	if conf.CalibrationSlope != nil {
+		if conf.CalibrationOffset != nil {
+			s.offset = *conf.CalibrationOffset
+		} else {
+			if err := s.tare(15); err != nil {
+				return nil, fmt.Errorf("tare failed: %w", err)
+			}
 		}
 	}
 
@@ -93,16 +95,36 @@ type hx711Sensor struct {
 	samples int
 	logger  logging.Logger
 
-	calibrationSlope  *float64
-	calibrationOffset *float64
+	offset           float64
+	calibrationSlope *float64
 }
 
 func (s *hx711Sensor) Name() resource.Name {
 	return s.name
 }
 
+func (s *hx711Sensor) tare(n int) error {
+	avg, err := s.hx.ReadAverage(n)
+	if err != nil {
+		return fmt.Errorf("tare failed: %w", err)
+	}
+	s.offset = avg
+	s.logger.Infof("HX711 tare value: %f", avg)
+	return nil
+}
+
+func (s *hx711Sensor) getValue() (float64, error) {
+	median, err := s.hx.ReadMedian(s.samples)
+	if err != nil {
+		return 0, err
+	}
+	result := median - s.offset
+	s.logger.Debugf("HX711 getValue: median=%f offset=%f result=%f", median, s.offset, result)
+	return result, nil
+}
+
 func (s *hx711Sensor) Readings(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
-	rawValue, err := s.hx.GetValue(s.samples)
+	rawValue, err := s.getValue()
 	if err != nil {
 		return nil, err
 	}
@@ -111,8 +133,8 @@ func (s *hx711Sensor) Readings(ctx context.Context, extra map[string]interface{}
 		"raw_value": roundTo(rawValue, 2),
 	}
 
-	if s.calibrationSlope != nil && s.calibrationOffset != nil {
-		weightKg := (*s.calibrationSlope * rawValue) + *s.calibrationOffset
+	if s.calibrationSlope != nil {
+		weightKg := (*s.calibrationSlope * rawValue)
 		forceN := weightKg * 9.81
 
 		readings["weight_kg"] = roundTo(weightKg, 4)
@@ -123,7 +145,26 @@ func (s *hx711Sensor) Readings(ctx context.Context, extra map[string]interface{}
 }
 
 func (s *hx711Sensor) DoCommand(ctx context.Context, cmd map[string]interface{}) (map[string]interface{}, error) {
-	return nil, nil
+	if _, ok := cmd["tare"]; ok {
+		if err := s.tare(15); err != nil {
+			return nil, err
+		}
+		return map[string]interface{}{
+			"offset": s.offset,
+		}, nil
+	}
+
+	if _, ok := cmd["get_calibration"]; ok {
+		result := map[string]interface{}{
+			"offset": s.offset,
+		}
+		if s.calibrationSlope != nil {
+			result["calibration_slope"] = *s.calibrationSlope
+		}
+		return result, nil
+	}
+
+	return nil, fmt.Errorf("unknown command, supported commands: tare, get_calibration")
 }
 
 func (s *hx711Sensor) Close(ctx context.Context) error {

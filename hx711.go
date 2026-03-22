@@ -18,7 +18,6 @@ type HX711 struct {
 	dout   *gpiod.Line
 	pdSck  *gpiod.Line
 	gain   int // extra clock pulses: 1→gain128, 2→gain32, 3→gain64
-	offset float64
 	logger logging.Logger
 }
 
@@ -40,7 +39,6 @@ func findGPIOChip(logger logging.Logger) (string, error) {
 
 func NewHX711(chipName string, doutPin, pdSckPin, gain int, logger logging.Logger) (*HX711, error) {
 	h := &HX711{
-		offset: 0,
 		logger: logger,
 	}
 
@@ -265,28 +263,6 @@ func (h *HX711) ReadAverage(n int) (float64, error) {
 		sum += v
 	}
 	return sum / float64(len(trimmed)), nil
-}
-
-// GetValue returns the median reading minus the tare offset.
-func (h *HX711) GetValue(samples int) (float64, error) {
-	median, err := h.ReadMedian(samples)
-	if err != nil {
-		return 0, err
-	}
-	result := median - h.offset
-	h.logger.Debugf("HX711 GetValue: median=%f offset=%f result=%f", median, h.offset, result)
-	return result, nil
-}
-
-// Tare sets the offset by averaging n readings.
-func (h *HX711) Tare(n int) error {
-	avg, err := h.ReadAverage(n)
-	if err != nil {
-		return fmt.Errorf("tare failed: %w", err)
-	}
-	h.offset = avg
-	h.logger.Infof("HX711 tare value: %f", avg)
-	return nil
 }
 
 // PowerDown puts the HX711 into low-power mode.
