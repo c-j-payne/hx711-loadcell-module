@@ -3,6 +3,7 @@ package hx711_loadcell
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"go.viam.com/rdk/components/sensor"
 	"go.viam.com/rdk/logging"
@@ -95,6 +96,8 @@ type hx711Sensor struct {
 	samples int
 	logger  logging.Logger
 
+	readLock sync.Mutex
+
 	offset           float64
 	calibrationSlope *float64
 }
@@ -104,6 +107,9 @@ func (s *hx711Sensor) Name() resource.Name {
 }
 
 func (s *hx711Sensor) tare(n int) error {
+	s.readLock.Lock()
+	defer s.readLock.Unlock()
+
 	avg, err := s.hx.ReadAverage(n)
 	if err != nil {
 		return fmt.Errorf("tare failed: %w", err)
@@ -114,6 +120,9 @@ func (s *hx711Sensor) tare(n int) error {
 }
 
 func (s *hx711Sensor) getValue() (float64, error) {
+	s.readLock.Lock()
+	defer s.readLock.Unlock()
+
 	median, err := s.hx.ReadAverage(s.samples)
 	if err != nil {
 		return 0, err

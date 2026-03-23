@@ -100,12 +100,14 @@ func NewHX711(chipName string, doutPin, pdSckPin, gain int, logger logging.Logge
 }
 
 // readBit clocks PD_SCK and reads one bit from DOUT.
-// The gpiocdev ioctl calls take ~10-20μs each, which satisfies
-// both T1 (PD_SCK high min 0.2μs) and T3 (data valid after 0.1μs).
+// Matches the HX711 reference driver: read DOUT after falling edge.
+// Data is stable from 0.1μs after rising edge until the next rising edge.
+// Reading after falling edge minimizes PD_SCK high time (~10μs for one ioctl
+// vs ~20μs if we read while high), reducing risk of >60μs power-down.
 func (h *HX711) readBit() (int, error) {
 	h.pdSck.SetValue(1)
-	val, err := h.dout.Value()
 	h.pdSck.SetValue(0)
+	val, err := h.dout.Value()
 	return val, err
 }
 
@@ -216,6 +218,8 @@ func (h *HX711) ReadAverage(n int) (float64, error) {
 		}
 		values[i] = float64(v)
 	}
+
+	h.logger.Debugf("ReadAverage raw: %v", logging.FloatArrayFormat{"", values})
 
 	return average(values), nil
 }
