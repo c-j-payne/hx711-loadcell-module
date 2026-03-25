@@ -74,6 +74,7 @@ func newSensor(ctx context.Context, deps resource.Dependencies, config resource.
 		hx:               hx,
 		samples:          samples,
 		logger:           logger,
+		attributes:       config.Attributes,
 		calibrationSlope: conf.CalibrationSlope,
 	}
 
@@ -100,6 +101,7 @@ type hx711Sensor struct {
 
 	readLock sync.Mutex
 
+	attributes       rdkutils.AttributeMap
 	offset           float64
 	calibrationSlope *float64
 }
@@ -183,10 +185,11 @@ func (s *hx711Sensor) DoCommand(ctx context.Context, cmd map[string]interface{})
 		slope := weightKg / rawValue
 		s.calibrationSlope = &slope
 
+		s.attributes["calibration_slope"] = slope
 		err = vmodutils.UpdateComponentCloudAttributesFromModuleEnv(
 			ctx,
 			s.name,
-			rdkutils.AttributeMap{"calibration_slope": slope},
+			s.attributes,
 			s.logger,
 		)
 		if err != nil {
@@ -198,7 +201,7 @@ func (s *hx711Sensor) DoCommand(ctx context.Context, cmd map[string]interface{})
 		}, nil
 	}
 
-	return nil, fmt.Errorf("unknown command, supported commands: tare, get_calibration")
+	return nil, fmt.Errorf("unknown command, supported commands: tare, get_calibration, calibrate_kg")
 }
 
 func (s *hx711Sensor) Close(ctx context.Context) error {
