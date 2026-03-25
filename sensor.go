@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/erh/vmodutils"
 	"go.viam.com/rdk/components/sensor"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
+	rdkutils "go.viam.com/rdk/utils"
 	"go.viam.com/utils"
 )
 
@@ -171,6 +173,29 @@ func (s *hx711Sensor) DoCommand(ctx context.Context, cmd map[string]interface{})
 			result["calibration_slope"] = *s.calibrationSlope
 		}
 		return result, nil
+	}
+
+	if weightKg, ok := cmd["calibrate_kg"].(float64); ok {
+		rawValue, err := s.getValue()
+		if err != nil {
+			return nil, err
+		}
+		slope := weightKg / rawValue
+		s.calibrationSlope = &slope
+
+		err = vmodutils.UpdateComponentCloudAttributesFromModuleEnv(
+			ctx,
+			s.name,
+			rdkutils.AttributeMap{"calibration_slope": slope},
+			s.logger,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to save calibration to config: %w", err)
+		}
+
+		return map[string]interface{}{
+			"slope": slope,
+		}, nil
 	}
 
 	return nil, fmt.Errorf("unknown command, supported commands: tare, get_calibration")
