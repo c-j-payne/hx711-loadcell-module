@@ -39,6 +39,32 @@ A Viam module for HX711 load cell amplifiers, providing calibrated force and wei
 - `weight_kg`: Calibrated weight in kilograms (if calibrated)
 - `force_N`: Calibrated force in Newtons (if calibrated)
 
+## DoCommands
+
+### tare
+Zeros the sensor by setting the current reading as the offset. Run with no load on the cell.
+
+```python
+await loadcell.do_command({"tare": True})
+# Returns: {"offset": 123456.0}
+```
+
+### calibrate_kg
+Calibrates the sensor with a known weight. Place the known weight on the cell, then call with the weight in kg. Saves the computed `calibration_slope` back to the cloud config.
+
+```python
+await loadcell.do_command({"calibrate_kg": 5.0})
+# Returns: {"slope": 0.000045}
+```
+
+### get_calibration
+Returns the current calibration values.
+
+```python
+await loadcell.do_command({"get_calibration": True})
+# Returns: {"offset": 123456.0, "calibration_slope": 0.000045}
+```
+
 ## Example
 ```python
 from viam.components.sensor import Sensor

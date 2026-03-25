@@ -6,9 +6,18 @@
   "models": [
     {
       "api": "rdk:component:sensor",
-      "model": "chris:sensor:hx711"
+      "model": "chris:sensor:hx711",
+      "markdown_link": "README.md",
+      "short_description": "HX711 Load Cell Sensor"
     }
   ],
-  "entrypoint": "src/main.py",
-  "first_run": "setup.sh"
+  "entrypoint": "./hx711-loadcell",
+  "build": {
+    "build": "make module",
+    "setup": "",
+    "path": "module.tar.gz",
+    "arch": [
+      "linux/arm64"
+    ]
+  }
 }
